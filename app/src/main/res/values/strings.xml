@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">GitRepoViewer</string>
+    <string name="repositories">Repositories</string>
+    <string name="issues">Issues</string>
+    <string name="request_not_successful">Error occurred</string>
+    <string name="could_not_get_repo_issues">Error occurred, could not get repo issues</string>
+    <string name="no_repositories">No Repositories found</string>
+    <string name="no_internet_connection">Connection error, please check your network</string>
+    <string name="search">Search</string>
+    <string name="details">Details</string>
+    <string name="showing_old_data">, Showing old data if existed</string>
+    <string name="no_details">No Details found</string>
+    <string name="no_issues">No Issues found</string>
+    <string name="retry">Retry</string>
+</resources>
