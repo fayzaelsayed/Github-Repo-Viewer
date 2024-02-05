@@ -2,7 +2,7 @@ package com.example.gitrepoviewer.di
 
 import com.example.gitrepoviewer.data.local.dao.DetailsDAO
 import com.example.gitrepoviewer.data.local.dao.RepoDAO
-import com.example.gitrepoviewer.data.remote.GitHubApi
+import com.example.gitrepoviewer.data.remote.GitHubApiService
 import com.example.gitrepoviewer.data.repository.DetailsRepositoryImpl
 import com.example.gitrepoviewer.data.repository.GitRepositoryImpl
 import com.example.gitrepoviewer.util.UtilFunctions
@@ -18,13 +18,13 @@ object RepositoryModule {
 
     @Singleton
     @Provides
-    fun provideGitRepository(gitHubApi: GitHubApi,repoDao: RepoDAO, utilFunctions: UtilFunctions): GitRepositoryImpl {
+    fun provideGitRepository(gitHubApi: GitHubApiService, repoDao: RepoDAO, utilFunctions: UtilFunctions): GitRepositoryImpl {
         return GitRepositoryImpl(gitHubApi, repoDao, utilFunctions)
     }
 
     @Singleton
     @Provides
-    fun provideDetailsRepository(gitHubApi: GitHubApi, detailsDAO: DetailsDAO, utilFunctions: UtilFunctions): DetailsRepositoryImpl {
+    fun provideDetailsRepository(gitHubApi: GitHubApiService, detailsDAO: DetailsDAO, utilFunctions: UtilFunctions): DetailsRepositoryImpl {
         return DetailsRepositoryImpl(gitHubApi, detailsDAO, utilFunctions)
     }
 

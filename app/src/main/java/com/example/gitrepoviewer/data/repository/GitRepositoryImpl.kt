@@ -3,7 +3,7 @@ package com.example.gitrepoviewer.data.repository
 import com.example.gitrepoviewer.R
 import com.example.gitrepoviewer.data.local.dao.RepoDAO
 import com.example.gitrepoviewer.data.local.entities.RepoEntity
-import com.example.gitrepoviewer.data.remote.GitHubApi
+import com.example.gitrepoviewer.data.remote.GitHubApiService
 import com.example.gitrepoviewer.domain.model.RepoResponseModel
 import com.example.gitrepoviewer.domain.repository.IGitRepository
 import com.example.gitrepoviewer.util.UtilFunctions
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.transform
 import javax.inject.Inject
 
 class GitRepositoryImpl @Inject constructor(
-    private val gitHubApi: GitHubApi,
+    private val gitHubApi: GitHubApiService,
     private val repoDAO: RepoDAO,
     private val utilFunctions: UtilFunctions
 ) : IGitRepository {

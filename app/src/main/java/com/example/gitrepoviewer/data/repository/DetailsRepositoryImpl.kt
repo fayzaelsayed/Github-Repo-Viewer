@@ -3,7 +3,7 @@ package com.example.gitrepoviewer.data.repository
 import com.example.gitrepoviewer.R
 import com.example.gitrepoviewer.data.local.dao.DetailsDAO
 import com.example.gitrepoviewer.data.local.entities.RepoDetailsEntity
-import com.example.gitrepoviewer.data.remote.GitHubApi
+import com.example.gitrepoviewer.data.remote.GitHubApiService
 import com.example.gitrepoviewer.domain.model.RepoDetailsModel
 import com.example.gitrepoviewer.domain.model.RepoIssuesModel
 import com.example.gitrepoviewer.domain.repository.IDetailsRepository
@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.transform
 import javax.inject.Inject
 
 class DetailsRepositoryImpl @Inject constructor(
-    private val gitHubApi: GitHubApi,
+    private val gitHubApi: GitHubApiService,
     private val detailsDAO: DetailsDAO,
     private val utilFunctions: UtilFunctions
 ) : IDetailsRepository {

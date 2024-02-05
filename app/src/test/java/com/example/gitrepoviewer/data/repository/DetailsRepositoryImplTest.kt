@@ -3,7 +3,7 @@ package com.example.gitrepoviewer.data.repository
 import com.example.gitrepoviewer.R
 import com.example.gitrepoviewer.data.local.dao.DetailsDAO
 import com.example.gitrepoviewer.data.local.entities.RepoDetailsEntity
-import com.example.gitrepoviewer.data.remote.GitHubApi
+import com.example.gitrepoviewer.data.remote.GitHubApiService
 import com.example.gitrepoviewer.domain.model.RepoDetailsModel
 import com.example.gitrepoviewer.domain.model.RepoIssuesModel
 import com.example.gitrepoviewer.util.UtilFunctions
@@ -26,7 +26,7 @@ import retrofit2.Response
 class DetailsRepositoryImplTest {
 
     @Mock
-    private lateinit var gitHubApi: GitHubApi
+    private lateinit var gitHubApi: GitHubApiService
     @Mock
     private lateinit var detailsDAO: DetailsDAO
     @Mock

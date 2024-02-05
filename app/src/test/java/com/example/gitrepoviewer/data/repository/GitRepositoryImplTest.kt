@@ -4,7 +4,7 @@ package com.example.gitrepoviewer.data.repository
 import com.example.gitrepoviewer.R
 import com.example.gitrepoviewer.data.local.dao.RepoDAO
 import com.example.gitrepoviewer.data.local.entities.RepoEntity
-import com.example.gitrepoviewer.data.remote.GitHubApi
+import com.example.gitrepoviewer.data.remote.GitHubApiService
 import com.example.gitrepoviewer.domain.model.RepoResponseModel
 import com.example.gitrepoviewer.util.UtilFunctions
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +26,7 @@ import retrofit2.Response
 class GitRepositoryImplTest {
 
     @Mock
-    private lateinit var gitHubApi: GitHubApi
+    private lateinit var gitHubApi: GitHubApiService
     @Mock
     private lateinit var repoDAO: RepoDAO
     @Mock

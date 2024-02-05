@@ -1,6 +1,6 @@
 package com.example.gitrepoviewer.di
 
-import com.example.gitrepoviewer.data.remote.GitHubApi
+import com.example.gitrepoviewer.data.remote.GitHubApiService
 import com.example.gitrepoviewer.util.Constants.BASE_URL
 import dagger.Module
 import dagger.Provides
@@ -20,13 +20,13 @@ object NetworkModule {
 
     @Singleton
     @Provides
-    fun provideGithubApi(okHttpClient: OkHttpClient): GitHubApi {
+    fun provideGithubApi(okHttpClient: OkHttpClient): GitHubApiService {
         return Retrofit.Builder()
             .addConverterFactory(GsonConverterFactory.create())
             .baseUrl(BASE_URL)
             .client(okHttpClient)
             .build()
-            .create(GitHubApi::class.java)
+            .create(GitHubApiService::class.java)
     }
 
     @Singleton

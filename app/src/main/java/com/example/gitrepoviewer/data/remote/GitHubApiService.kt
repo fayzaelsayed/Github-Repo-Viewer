@@ -8,7 +8,7 @@ import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Path
 
-interface GitHubApi {
+interface GitHubApiService {
 
     @GET("/repositories")
     suspend fun getRepositories() : Response<List<RepoResponseModel>>
