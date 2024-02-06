@@ -6,6 +6,7 @@
 - The app supports offline mode, dark mode and searching
 - Using mobile data instead of wi-fi is recommended since it seems to have better performance with the github API.
 
+
 # Technologies
 - Jetpack Compose
 - Kotlin Flows
