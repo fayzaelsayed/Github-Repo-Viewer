@@ -12,4 +12,6 @@
     <string name="no_details">No Details found</string>
     <string name="no_issues">No Issues found</string>
     <string name="retry">Retry</string>
+    <string name="no_data_available_please_refresh">No cached data, Please check your connection and swipe to refresh</string>
+    <string name="no_issues_available_for_this_repository">No Issues available for this repository</string>
 </resources>

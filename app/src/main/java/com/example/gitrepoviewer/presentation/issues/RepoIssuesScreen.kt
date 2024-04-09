@@ -2,6 +2,7 @@ package com.example.gitrepoviewer.presentation.issues
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -50,15 +52,14 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.gitrepoviewer.R
-import com.example.gitrepoviewer.domain.model.RepoIssuesModel
+import com.example.gitrepoviewer.domain.model.RepositoryIssues
 import com.example.gitrepoviewer.util.UtilFunctions
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RepoIssuesScreen(
-    navController: NavController = rememberNavController(),
-    repoId: Long?
+    navController: NavController = rememberNavController()
 ) {
     Scaffold(topBar = {
         CenterAlignedTopAppBar(
@@ -88,19 +89,21 @@ fun RepoIssuesScreen(
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
         )
     }, content = {
-        IssuesMainContent(repoId, it)
+        val viewModel = hiltViewModel<RepoIssuesViewModel>()
+        HandlingErrors(viewModel)
+        IssuesMainContent(it, viewModel)
     })
 }
 
 @Composable
-fun IssuesMainContent(repoId: Long?, paddingValues: PaddingValues) {
+fun IssuesMainContent(paddingValues: PaddingValues, viewModel: RepoIssuesViewModel) {
     Surface(
         modifier = Modifier.padding(top = paddingValues.calculateTopPadding()),
         color = MaterialTheme.colorScheme.surface
     ) {
-        val viewModel = hiltViewModel<RepoIssuesViewModel>()
-        val issuesList = viewModel.getRepoIssues(repoId!!).collectAsState(null).value?.repo_issues
-        if (issuesList.isNullOrEmpty()) {
+        val issuesList = viewModel.viewState.collectAsState().value.issues
+        val isLoading = viewModel.viewState.collectAsState().value.isLoading
+        if (isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -109,18 +112,38 @@ fun IssuesMainContent(repoId: Long?, paddingValues: PaddingValues) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
         } else {
-            LazyColumn {
-                items(items = issuesList) { issue ->
-                    IssueRow(issue = issue)
+            if (issuesList.isNullOrEmpty()){
+                EmptyListView()
+            }else {
+                LazyColumn {
+                    items(items = issuesList) { issue ->
+                        IssueRow(issue = issue)
+                    }
                 }
             }
         }
     }
 }
 
+@Composable
+private fun EmptyListView() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = stringResource(R.string.no_issues_available_for_this_repository), style = TextStyle(
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface
+        ) )
+    }
+}
+
 @Preview
 @Composable
-fun IssueRow(issue: RepoIssuesModel = RepoIssuesModel()) {
+fun IssueRow(issue: RepositoryIssues = RepositoryIssues()) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -137,7 +160,7 @@ fun IssueRow(issue: RepoIssuesModel = RepoIssuesModel()) {
 }
 
 @Composable
-fun IssueInfoRow(issue: RepoIssuesModel){
+fun IssueInfoRow(issue: RepositoryIssues){
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
         modifier = Modifier
             .padding(top = 12.dp)
@@ -201,7 +224,7 @@ fun IssueInfoRow(issue: RepoIssuesModel){
 
 
 @Composable
-fun IssueStatusRow(issue: RepoIssuesModel){
+fun IssueStatusRow(issue: RepositoryIssues){
     Row(modifier = Modifier
         .fillMaxWidth()
         .background(MaterialTheme.colorScheme.surface)
@@ -248,4 +271,14 @@ fun IssueStatusRow(issue: RepoIssuesModel){
 
     }
     Spacer(modifier = Modifier.height(12.dp))
+}
+
+@Composable
+private fun HandlingErrors(viewModel: RepoIssuesViewModel) {
+    val errorMessage = viewModel.viewState.collectAsState().value.error
+    val context = LocalContext.current
+    errorMessage?.let { message ->
+        Toast.makeText(context, message + stringResource(id = R.string.showing_old_data), Toast.LENGTH_SHORT).show()
+        viewModel.clearErrorMessage()
+    }
 }

@@ -1,65 +1,106 @@
 package com.example.gitrepoviewer.presentation.details
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.gitrepoviewer.data.local.entities.RepoDetailsEntity
-import com.example.gitrepoviewer.data.repository.DetailsRepositoryImpl
+import com.example.gitrepoviewer.common.Resource
+import com.example.gitrepoviewer.domain.use_case.repo_details.GetRepoDetailsUseCase
+import com.example.gitrepoviewer.domain.use_case.repo_details.RequestRepoDetailsUseCase
+import com.example.gitrepoviewer.util.DispatcherProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class RepoDetailsViewModel @Inject constructor(
-    private val detailsRepositoryImpl: DetailsRepositoryImpl
-) : ViewModel() {
+    private val requestRepositoryDetailsUseCase: RequestRepoDetailsUseCase,
+    private val getRepositoryDetailsUseCase: GetRepoDetailsUseCase,
+    private val dispatcherProvider: DispatcherProvider,
+    savedStateHandle: SavedStateHandle,
 
-    private val _repoId = MutableStateFlow<Long?>(null)
-    val repoId = _repoId.asStateFlow()
+    ) : ViewModel() {
 
-    private val _ownerName = MutableStateFlow<String?>(null)
-    val ownerName = _ownerName.asStateFlow()
+    private val _viewState = MutableStateFlow(RepoDetailsViewState())
+    val viewState: StateFlow<RepoDetailsViewState> get() = _viewState
 
-    private val _repoName = MutableStateFlow<String?>(null)
-    val repoName = _repoName.asStateFlow()
-
-    val errorMessage = detailsRepositoryImpl.errorMessageResourceId.asStateFlow()
-
-    private val _details = MutableStateFlow<RepoDetailsEntity?>(null)
-    val details = _details.asStateFlow()
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            combine(_repoName, _repoId, _ownerName) { repoName, repoId, ownerName ->
-                Triple(repoName, repoId, ownerName)
-            }.collect { (repoName, repoId, ownerName) ->
-                if (repoName != null && repoId != null && ownerName != null) {
-                    detailsRepositoryImpl.fetchRepoDetails(ownerName, repoName, repoId)
-                    detailsRepositoryImpl.getRepoDetails(repoId).collect { repoDetailsEntity ->
-                        _details.value = repoDetailsEntity
+        val ownerName: String = savedStateHandle.get<String>("ownerName")!!
+        val repoName: String = savedStateHandle.get<String>("repoName")!!
+        val repoId: Long = savedStateHandle.get<Long>("repoId")!!
+
+        fetchRepoDetails(ownerName, repoName, repoId)
+    }
+
+     fun fetchRepoDetails(ownerName: String, repoName: String, repoId: Long) {
+        viewModelScope.launch(dispatcherProvider.main) {
+            requestRepositoryDetailsUseCase(ownerName, repoName).flowOn(dispatcherProvider.io)
+                .collect {
+                    when (it) {
+                        is Resource.Loading -> _viewState.update { viewState ->
+                            viewState.copy(isLoading = it.loading, repoDetails = null, error = null)
+                        }
+                        is Resource.Success -> getRepoDetails(repoId)
+                        is Resource.Failure -> {
+                            _viewState.update { viewState ->
+                                viewState.copy(
+                                    isLoading = false,
+                                    repoDetails = null,
+                                    error = it.exception.localizedMessage
+                                )
+                            }
+                            delay(1000)
+                            getRepoDetails(repoId)
+                        }
                     }
                 }
-            }
         }
     }
 
-    fun setRepoId(id: Long) {
-        _repoId.value = id
+    fun getRepoDetails(repoId: Long) {
+        viewModelScope.launch(dispatcherProvider.main) {
+            getRepositoryDetailsUseCase(repoId).flowOn(dispatcherProvider.io)
+                .collect { detailsResource ->
+                    when (detailsResource) {
+                        is Resource.Loading -> _viewState.update { viewState ->
+                            viewState.copy(
+                                isLoading = detailsResource.loading,
+                                repoDetails = null,
+                                error = null
+                            )
+                        }
+
+                        is Resource.Success -> _viewState.update { viewState ->
+                            viewState.copy(
+                                isLoading = false,
+                                repoDetails = detailsResource.data,
+                                error = null
+                            )
+                        }
+
+                        is Resource.Failure -> _viewState.update { viewState ->
+                            viewState.copy(
+                                isLoading = false,
+                                repoDetails = null,
+                                error = detailsResource.exception.localizedMessage
+                            )
+                        }
+                    }
+                }
+        }
+
     }
 
-    fun setRepoName(repoName: String) {
-        _repoName.value = repoName
-    }
-
-    fun setOwnerName(ownerName: String) {
-        _ownerName.value = ownerName
-    }
 
     fun clearErrorMessage() {
-        detailsRepositoryImpl.errorMessageResourceId.value = null
+        _viewState.update { viewState ->
+            viewState.copy(error = null)
+        }
     }
 
 }

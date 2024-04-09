@@ -136,4 +136,6 @@ dependencies {
     androidTestImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.2.1"
     androidTestImplementation "androidx.arch.core:core-testing:2.1.0"
     androidTestImplementation "com.google.truth:truth:1.0.1"
+    // testing flow
+    testImplementation 'app.cash.turbine:turbine:0.11.0'
 }

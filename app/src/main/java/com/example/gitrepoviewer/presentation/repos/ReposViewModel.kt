@@ -2,87 +2,179 @@ package com.example.gitrepoviewer.presentation.repos
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.gitrepoviewer.data.local.entities.RepoEntity
-import com.example.gitrepoviewer.data.repository.GitRepositoryImpl
+import com.example.gitrepoviewer.common.Resource
+import com.example.gitrepoviewer.domain.model.Repository
+import com.example.gitrepoviewer.domain.use_case.repo.GetReposUseCase
+import com.example.gitrepoviewer.domain.use_case.repo.RequestReposUseCase
+import com.example.gitrepoviewer.domain.use_case.repo.SearchReposUseCase
+import com.example.gitrepoviewer.util.DispatcherProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ReposViewModel @Inject constructor(
-    private val gitRepositoryImpl: GitRepositoryImpl
+    private val requestReposUseCase: RequestReposUseCase,
+    private val getReposUseCase: GetReposUseCase,
+    private val searchReposUseCase: SearchReposUseCase,
+    private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
-    val isFetchingDone = gitRepositoryImpl.isFetchingDone.asStateFlow()
-
-    val errorMessageResourceId = gitRepositoryImpl.errorMessageResourceId.asStateFlow()
+    private val _viewState = MutableStateFlow(ReposViewState())
+    val viewState: StateFlow<ReposViewState> get() = _viewState
 
     private val _searchText = MutableStateFlow("")
-    val searchText = _searchText.asStateFlow()
+    val searchText: StateFlow<String> get() = _searchText
 
-    private val _isSearching = MutableStateFlow(false)
-    val isSearching = _isSearching.asStateFlow()
-
-    private val _repos = MutableStateFlow<List<RepoEntity>>(emptyList())
-    val reposState = _repos.asStateFlow()
-    val repos = searchText
-        .onEach { _isSearching.update { true } }
-        .combine(_repos) { text, repos ->
-        if (text.isBlank()) {
-            repos
-        } else {
-            delay(1000L)
-            repos.filter { it.doesMatchSearchText(text) }
-        }
-    }
-        .onEach { _isSearching.update { false } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _repos.value)
-
+    private val _reposList = mutableListOf<Repository>()
+    private val _filteredReposList = mutableListOf<Repository>()
+    var pageNumber = 0
+    var paginate = true
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            gitRepositoryImpl.fetchAllRepos()
-            gitRepositoryImpl.getAllRepos().collect { reposList ->
-                _repos.value = reposList
+        fetchRepos()
+    }
+
+    fun fetchRepos() {
+        viewModelScope.launch(dispatcherProvider.main) {
+            pageNumber = 0
+            _searchText.value = ""
+            requestReposUseCase().flowOn(dispatcherProvider.io).collect {
+                when (it) {
+                    is Resource.Loading -> _viewState.update { viewState ->
+                        viewState.copy(
+                            isLoading = it.loading,
+                            reposList = null,
+                            filteredReposList = null,
+                            error = null,
+                            isSearching = false,
+                            isPaginating = false
+                        )
+                    }
+
+                    is Resource.Success -> {
+                        _reposList.clear()
+                        _filteredReposList.clear()
+                        _viewState.update { viewState ->
+                            viewState.copy(reposList = emptyList(), filteredReposList = emptyList())
+                        }
+                        getRepos(0)
+                    }
+
+                    is Resource.Failure -> {
+                        _viewState.update { viewState ->
+                            viewState.copy(
+                                isLoading = false,
+                                reposList = null,
+                                filteredReposList = null,
+                                error = it.exception.localizedMessage,
+                                isSearching = false,
+                                isPaginating = false
+                            )
+                        }
+                        delay(1000)
+                        getRepos(0)
+                    }
+                }
             }
         }
     }
 
-    fun retryFetchRepos(){
-        viewModelScope.launch(Dispatchers.IO){
-            gitRepositoryImpl.isFetchingDone.value = false
-            gitRepositoryImpl.fetchAllRepos()
+    fun getRepos(pageNumber: Int) {
+        viewModelScope.launch(dispatcherProvider.main) {
+            getReposUseCase(pageNumber).flowOn(dispatcherProvider.io).collect {
+                when (it) {
+                    is Resource.Loading ->
+                        if (pageNumber == 0) {
+                            _viewState.update { viewState ->
+                                viewState.copy(
+                                    isLoading = true,
+                                    reposList = emptyList(),
+                                    filteredReposList = emptyList(),
+                                    error = null,
+                                    isSearching = false,
+                                    isPaginating = false
+                                )
+                            }
+                        } else {
+                            _viewState.update { viewState ->
+                                viewState.copy(
+                                    isLoading = false,
+                                    error = null,
+                                    isSearching = false,
+                                    isPaginating = true
+                                )
+                            }
+                        }
+
+                    is Resource.Success -> {
+                        if (pageNumber == 0) {
+                            _reposList.clear()
+                            _filteredReposList.clear()
+                        } else {
+                            delay(1000)
+                        }
+                        _reposList.addAll(it.data!!)
+                        _filteredReposList.addAll(it.data)
+                        _viewState.update { viewState ->
+                            viewState.copy(
+                                isLoading = false,
+                                reposList = _reposList.toList(),
+                                filteredReposList = _filteredReposList.toList(),
+                                error = if (it.data.isEmpty() && pageNumber > 0) "No more data available" else null,
+                                isSearching = false,
+                                isPaginating = false
+                            )
+                        }
+                        paginate = true
+                    }
+
+                    is Resource.Failure -> {
+                        _viewState.update { viewState ->
+                            viewState.copy(
+                                isLoading = false,
+                                reposList = null,
+                                filteredReposList = null,
+                                error = it.exception.localizedMessage,
+                                isSearching = false,
+                                isPaginating = false
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
-
-    fun onSearchTextChange(text: String) {
+    fun searchWithFakeDelay(text: String) {
         _searchText.value = text
+        viewModelScope.launch(dispatcherProvider.main) {
+            _viewState.update { viewState ->
+                viewState.copy(isSearching = true)
+            }
+            delay(1000)
+            searchRepos(text)
+        }
+    }
+
+    fun searchRepos(text: String) {
+        _viewState.update { viewState ->
+            viewState.copy(
+                filteredReposList = searchReposUseCase(viewState.reposList!!, text),
+                isSearching = false
+            )
+        }
     }
 
     fun clearErrorMessage() {
-        gitRepositoryImpl.errorMessageResourceId.value = null
+        _viewState.update { viewState ->
+            viewState.copy(error = null)
+        }
     }
 
-    fun getReposForTest() = searchText
-        .onEach { _isSearching.update { true } }
-        .combine(_repos) { text, repos ->
-            if (text.isBlank()) {
-                repos
-            } else {
-                delay(1000L)
-                repos.filter { it.doesMatchSearchText(text) }
-            }
-        }
-        .onEach { _isSearching.update { false } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _repos.value)
 }

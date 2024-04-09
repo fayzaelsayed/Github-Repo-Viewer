@@ -5,8 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.gitrepoviewer.navigation.RepoNavigation
-import com.example.gitrepoviewer.ui.theme.GitRepoViewerTheme
+import com.example.gitrepoviewer.presentation.navigation.RepoNavigation
+import com.example.gitrepoviewer.presentation.theme.GitRepoViewerTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

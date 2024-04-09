@@ -34,9 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,8 +51,8 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.gitrepoviewer.R
-import com.example.gitrepoviewer.data.local.entities.RepoDetailsEntity
-import com.example.gitrepoviewer.navigation.RepoScreens
+import com.example.gitrepoviewer.domain.model.RepositoryDetails
+import com.example.gitrepoviewer.presentation.navigation.RepoScreens
 import com.example.gitrepoviewer.util.UtilFunctions.Companion.formatDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,26 +90,14 @@ fun RepoDetailsScreen(
         )
     }, content = {
         Surface(
-            modifier = Modifier.padding(top = it.calculateTopPadding()).fillMaxHeight(),
+            modifier = Modifier
+                .padding(top = it.calculateTopPadding())
+                .fillMaxHeight(),
             color = MaterialTheme.colorScheme.surface
         ) {
             val viewModel = hiltViewModel<RepoDetailsViewModel>()
-            LaunchedEffect(Unit) {
-                viewModel.setRepoId(repoId!!)
-                viewModel.setRepoName(repoName!!)
-                viewModel.setOwnerName(ownerName!!)
-            }
-            val errorMessageResource = viewModel.errorMessage.collectAsState(initial = null).value
-            val context = LocalContext.current
-            errorMessageResource?.let { messageResource ->
-                Toast.makeText(
-                    context,
-                    stringResource(messageResource) + stringResource(id = R.string.showing_old_data),
-                    Toast.LENGTH_SHORT
-                ).show()
-                viewModel.clearErrorMessage()
-            }
-            MainContent(navController, viewModel, repoId)
+            HandlingErrors(viewModel)
+            MainContent(navController, viewModel, ownerName, repoName, repoId)
         }
     })
 }
@@ -120,12 +106,15 @@ fun RepoDetailsScreen(
 fun MainContent(
     navController: NavController,
     viewModel: RepoDetailsViewModel,
+    ownerName: String?,
+    repoName: String?,
     repoId: Long?
 ) {
 
-    val repoDetails by viewModel.details.collectAsState(initial = null)
+    val repoDetails = viewModel.viewState.collectAsState().value.repoDetails
+    val isLoading = viewModel.viewState.collectAsState().value.isLoading
 
-    if (repoDetails == null) {
+    if (isLoading) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -134,43 +123,52 @@ fun MainContent(
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
     } else {
-        Column(
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Top,
-            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-        ) {
-
-            OwnerImageAndName(repoDetails)
-
-            Text(
-                text = repoDetails?.name ?: "Repo name",
-                style = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
-                modifier = Modifier.padding(start = 12.dp, top = 4.dp)
+        if (repoDetails == null){
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
             )
+        }else{
+            Column(
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.Top,
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            ) {
 
-            Text(
-                text = repoDetails?.description ?: "Description",
-                style = TextStyle(fontSize = 16.sp, color = MaterialTheme.colorScheme.onSecondary),
-                modifier = Modifier.padding(start = 12.dp, top = 16.dp)
-            )
+                OwnerImageAndName(repoDetails)
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = repoDetails.name ?: "Repo name",
+                    style = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
+                    modifier = Modifier.padding(start = 12.dp, top = 4.dp)
+                )
 
-            StarsAndForksRow(repoDetails)
+                Text(
+                    text = repoDetails.description ?: "Description",
+                    style = TextStyle(fontSize = 16.sp, color = MaterialTheme.colorScheme.onSecondary),
+                    modifier = Modifier.padding(start = 12.dp, top = 16.dp)
+                )
 
-            WatchingRow(repoDetails)
+                Spacer(modifier = Modifier.height(12.dp))
 
-            OpenIssuesRow(repoDetails, navController, repoId)
+                StarsAndForksRow(repoDetails)
 
-            CreatedAtRow(repoDetails)
+                WatchingRow(repoDetails)
 
+                OpenIssuesRow(repoDetails, navController, ownerName, repoName, repoId)
+
+                CreatedAtRow(repoDetails)
+
+            }
         }
     }
 
 }
 
+
 @Composable
-private fun CreatedAtRow(repoDetails: RepoDetailsEntity?) {
+private fun CreatedAtRow(repositoryDetails: RepositoryDetails?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -192,11 +190,11 @@ private fun CreatedAtRow(repoDetails: RepoDetailsEntity?) {
             color = MaterialTheme.colorScheme.onSecondary
         )
         Text(
-            text = repoDetails?.createdAt?.let {
+            text = repositoryDetails?.createdAt?.let {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     formatDate(it)
                 } else {
-                    repoDetails.createdAt
+                    repositoryDetails.createdAt
                 }
             } ?: "N/A",
             Modifier.padding(start = 4.dp),
@@ -211,8 +209,10 @@ private fun CreatedAtRow(repoDetails: RepoDetailsEntity?) {
 
 @Composable
 private fun OpenIssuesRow(
-    repoDetails: RepoDetailsEntity?,
+    repositoryDetails: RepositoryDetails?,
     navController: NavController,
+    ownerName: String?,
+    repoName: String?,
     repoId: Long?
 ) {
     Row(
@@ -231,7 +231,7 @@ private fun OpenIssuesRow(
             tint = Color.Gray
         )
         Text(
-            text = repoDetails?.openIssuesCount?.toString() ?: "N/A",
+            text = repositoryDetails?.openIssuesCount?.toString() ?: "N/A",
             Modifier.padding(start = 4.dp),
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
@@ -253,13 +253,13 @@ private fun OpenIssuesRow(
             modifier = Modifier
                 .padding(end = 12.dp)
                 .clickable {
-                    navController.navigate(RepoScreens.RepoIssuesScreen.name + "/$repoId")
+                    navController.navigate(RepoScreens.RepoIssuesScreen.name + "/$ownerName" + "/$repoName" + "/$repoId")
                 })
     }
 }
 
 @Composable
-private fun WatchingRow(repoDetails: RepoDetailsEntity?) {
+private fun WatchingRow(repositoryDetails: RepositoryDetails?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -276,7 +276,7 @@ private fun WatchingRow(repoDetails: RepoDetailsEntity?) {
             tint = Color.Gray
         )
         Text(
-            text = repoDetails?.subscribersCount?.toString() ?: "N/A",
+            text = repositoryDetails?.subscribersCount?.toString() ?: "N/A",
             Modifier.padding(start = 4.dp),
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
@@ -292,7 +292,7 @@ private fun WatchingRow(repoDetails: RepoDetailsEntity?) {
 }
 
 @Composable
-private fun StarsAndForksRow(repoDetails: RepoDetailsEntity?) {
+private fun StarsAndForksRow(repositoryDetails: RepositoryDetails?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -309,7 +309,7 @@ private fun StarsAndForksRow(repoDetails: RepoDetailsEntity?) {
             tint = Color.Gray
         )
         Text(
-            text = repoDetails?.stargazersCount?.toString() ?: "N/A",
+            text = repositoryDetails?.stargazersCount?.toString() ?: "N/A",
             Modifier.padding(start = 4.dp),
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
@@ -328,7 +328,7 @@ private fun StarsAndForksRow(repoDetails: RepoDetailsEntity?) {
             tint = Color.Black
         )
         Text(
-            text = repoDetails?.forksCount?.toString() ?: "N/A",
+            text = repositoryDetails?.forksCount?.toString() ?: "N/A",
             Modifier.padding(start = 4.dp),
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
@@ -344,7 +344,7 @@ private fun StarsAndForksRow(repoDetails: RepoDetailsEntity?) {
 }
 
 @Composable
-private fun OwnerImageAndName(repoDetails: RepoDetailsEntity?) {
+private fun OwnerImageAndName(repositoryDetails: RepositoryDetails?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -360,7 +360,7 @@ private fun OwnerImageAndName(repoDetails: RepoDetailsEntity?) {
         ) {
 
             AsyncImage(
-                model = repoDetails?.owner?.avatarURL,
+                model = repositoryDetails?.owner?.avatarURL,
                 contentDescription = null,
             )
         }
@@ -368,9 +368,19 @@ private fun OwnerImageAndName(repoDetails: RepoDetailsEntity?) {
         Spacer(modifier = Modifier.width(4.dp))
         Column {
             Text(
-                text = repoDetails?.owner?.login ?: "Owner name",
+                text = repositoryDetails?.owner?.login ?: "Owner name",
                 style = TextStyle(color = MaterialTheme.colorScheme.onSecondary, fontSize = 14.sp)
             )
         }
+    }
+}
+
+@Composable
+private fun HandlingErrors(viewModel: RepoDetailsViewModel) {
+    val errorMessage = viewModel.viewState.collectAsState().value.error
+    val context = LocalContext.current
+    errorMessage?.let { message ->
+        Toast.makeText(context, message + stringResource(id = R.string.showing_old_data), Toast.LENGTH_SHORT).show()
+        viewModel.clearErrorMessage()
     }
 }
